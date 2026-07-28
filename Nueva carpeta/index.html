@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendario Hebreo</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Encabezado Principal -->
+    <header class="app-header">
+        <div class="header-flex-container">
+            <div class="header-title-block">
+                <h1>✡️ Calendario Hebreo</h1>
+                <div id="header-gregorian-date" class="header-gregorian-date">Cargando...</div>
+                <div id="header-hebrew-date" class="header-date">Cargando...</div>
+            </div>
+            <button id="btn-header-location-tag" class="btn-header-location" onclick="switchTab('view-location')" title="Cambiar ubicación y rito">
+                📍 Cargando...
+            </button>
+        </div>
+    </header>
+
+    <!-- Contenido de las Pestañas -->
+    <main class="main-content">
+
+        <!-- 1. Pestaña Hoy -->
+        <section id="view-today" class="tab-content active">
+            <!-- Bloque 1: Fecha de Hoy -->
+            <div class="card">
+                <h3>📅 Hoy es</h3>
+                <div id="today-gregorian" class="date-large">--</div>
+                <div id="today-hebrew" class="date-hebrew-large">--</div>
+            </div>
+
+            <!-- Bloque 2: Este Shabat -->
+            <div id="card-shabbat-today" class="card">
+                <div class="card-header-flex">
+                    <h3>🕯️ Este Shabat</h3>
+                    <button id="btn-today-location-tag" class="btn-badge" onclick="switchTab('view-location')">
+                        📍 Cargando...
+                    </button>
+                </div>
+                <div id="shabbat-today-info" class="info-box">Cargando datos de Shabat...</div>
+            </div>
+
+            <!-- Bloque 3: Parashat haShavua -->
+            <div id="card-parasha-today" class="card">
+                <h3>📜 Parashat haShavúa (Este Shabat)</h3>
+                <div id="parasha-today-info" class="info-box">Cargando Parashat...</div>
+            </div>
+
+            <!-- Bloque 4: Próximos eventos -->
+            <div id="card-upcoming-events" class="card">
+                <h3>📅 Próximos eventos</h3>
+                <div id="upcoming-events-list" class="info-box">Cargando eventos...</div>
+            </div>
+        </section>
+
+        <!-- 2. Pestaña Mes -->
+        <section id="view-month" class="tab-content">
+            <div class="card">
+                <div class="month-header">
+                    <button class="nav-month-btn" onclick="changeMonth(-1)">◀</button>
+                    <h3 id="month-title">--</h3>
+                    <button class="nav-month-btn" onclick="changeMonth(1)">▶</button>
+                </div>
+
+                <!-- Selector de mes/año y botón Hoy -->
+                <div class="month-picker-container">
+                    <div class="month-picker-inputs">
+                        <select id="select-month-picker" onchange="jumpToMonthYear()">
+                            <option value="0">Enero</option>
+                            <option value="1">Febrero</option>
+                            <option value="2">Marzo</option>
+                            <option value="3">Abril</option>
+                            <option value="4">Mayo</option>
+                            <option value="5">Junio</option>
+                            <option value="6">Julio</option>
+                            <option value="7">Agosto</option>
+                            <option value="8">Septiembre</option>
+                            <option value="9">Octubre</option>
+                            <option value="10">Noviembre</option>
+                            <option value="11">Diciembre</option>
+                        </select>
+                        <input type="number" id="input-year-picker" min="1" max="9999" onchange="jumpToMonthYear()">
+                    </div>
+                    <button class="btn-today-nav" onclick="goToCurrentMonth()">Hoy</button>
+                </div>
+
+                <div id="calendar-grid" class="calendar-grid"></div>
+                
+                <!-- Botón toggle para alternar inicio de semana -->
+                <button id="btn-toggle-week-start" class="btn-toggle-week" onclick="toggleWeekStart()">
+                    Cambiar a semana comenzando en lunes
+                </button>
+            </div>
+
+            <!-- Panel inferior para mostrar los eventos del día seleccionado (siempre visible) -->
+            <div id="month-day-details" class="card" style="margin-top: 15px;">
+                <h3 id="selected-day-title">📅 Eventos del día</h3>
+                <div id="selected-day-events" class="info-box">Cargando detalles del día...</div>
+            </div>
+        </section>
+
+        <!-- 3. Pestaña Convertir -->
+        <section id="view-convert" class="tab-content">
+            <!-- Conversión Gregoriano a Hebreo -->
+            <div class="card">
+                <h3>📅 Gregoriano ➔ Hebreo</h3>
+                <div class="input-group">
+                    <label for="greg-date">Fecha Gregoriana:</label>
+                    <input type="date" id="greg-date">
+                </div>
+
+                <div class="input-group checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="convert-after-sunset">
+                        <span>Tras la puesta de sol (marcar si procede si la fecha se refiere a algún aniversario)</span>
+                    </label>
+                </div>
+
+                <button class="btn-primary" onclick="convertGregorianToHebrew()">Convertir</button>
+                <div id="res-greg-to-heb" class="result-box"></div>
+            </div>
+
+            <!-- Conversión Hebreo a Gregoriano -->
+            <div class="card">
+                <h3>✡️ Hebreo ➔ Gregoriano</h3>
+                <div class="input-row heb-convert-row">
+                    <div class="input-group">
+                        <label for="heb-day">Día:</label>
+                        <input type="number" id="heb-day" min="1" max="30" value="1">
+                    </div>
+                    <div class="input-group">
+                        <label for="heb-month">Mes:</label>
+                        <select id="heb-month">
+                            <option value="Nisan">Nisán</option>
+                            <option value="Iyar">Iyar</option>
+                            <option value="Sivan">Siván</option>
+                            <option value="Tamuz">Tamuz</option>
+                            <option value="Av">Av</option>
+                            <option value="Elul">Elul</option>
+                            <option value="Tishrei">Tishrei</option>
+                            <option value="Cheshvan">Jeshván</option>
+                            <option value="Kislev">Kislev</option>
+                            <option value="Tevet">Tevet</option>
+                            <option value="Sh'vat">Shevat</option>
+                            <option value="Adar">Adar</option>
+                            <option value="Adar I">Adar I</option>
+                            <option value="Adar II">Adar II</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="heb-year">Año:</label>
+                        <input type="number" id="heb-year" value="5786">
+                    </div>
+                </div>
+
+                <button class="btn-primary" onclick="convertHebrewToGregorian()">Convertir</button>
+                <div id="res-heb-to-greg" class="result-box"></div>
+            </div>
+        </section>
+
+        <!-- 4. Pestaña Festivos -->
+        <section id="view-holidays" class="tab-content">
+            <div class="card">
+                <h3>🎉 Festividades del Año</h3>
+                <div class="input-group">
+                    <label for="holidays-year">Año Hebreo:</label>
+                    <input type="number" id="holidays-year" value="5786" onchange="loadHolidays()">
+                </div>
+                <div id="holidays-list" class="info-box">Cargando festivos...</div>
+            </div>
+        </section>
+
+        <!-- 5. Pestaña Shabat -->
+        <section id="view-shabbat" class="tab-content">
+            <div class="card">
+                <h3>🕯️ Horarios de Shabat</h3>
+                <div id="shabbat-details-list" class="info-box">Cargando información...</div>
+            </div>
+        </section>
+
+        <!-- 6. Pestaña Ubicación -->
+        <section id="view-location" class="tab-content">
+            <div class="card">
+                <h3>📍 Configuración de Ubicación y Rito</h3>
+                <p class="description-text">Selecciona la ubicación predeterminada para el cálculo preciso de los horarios de Shabat y festividades.</p>
+
+                <button class="btn-primary" onclick="setLocationFromGPS()">
+                    📡 Usar ubicación actual (GPS)
+                </button>
+
+                <hr class="separator">
+
+                <div class="input-group">
+                    <label for="city-search">Buscar ciudad manualmente:</label>
+                    <div class="search-box-container">
+                        <input type="text" id="city-search" placeholder="Ej. Torremolinos, Jerusalén, Nueva York..." onkeyup="searchCityDebounce()">
+                    </div>
+                    <div id="city-results-list" class="results-dropdown"></div>
+                </div>
+
+                <div class="info-box location-status">
+                    Ubicación activa: <strong id="lbl-active-location">Torremolinos</strong>
+                </div>
+
+                <hr class="separator">
+
+                <!-- Selector Israel / Diáspora -->
+                <div class="input-group">
+                    <label for="diaspora-mode-select">Esquema de Festividades (Yom Tov):</label>
+                    <select id="diaspora-mode-select" onchange="changeDiasporaMode()">
+                        <option value="auto">Automático (según coordenadas de la ubicación)</option>
+                        <option value="israel">Israel (1 día de Yom Tov)</option>
+                        <option value="diaspora">Diáspora (2 días de Yom Tov)</option>
+                    </select>
+                </div>
+
+                <!-- Nota sobre zona horaria local y rito -->
+                <div class="info-box" style="margin-top: 12px; font-size: 0.82rem; color: #475569; background-color: #f1f5f9; border-left: 3px solid #2b579a;">
+                    ℹ️ <strong>Nota:</strong> Todas las fechas, días y horas mostrados en la aplicación se adaptan automáticamente a la hora solar y hora oficial local correspondiente a la ubicación activa seleccionada. El esquema litúrgico de lecturas y días festivos se ajusta según se esté en Israel o en la Diáspora.
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Barra de Navegación Inferior -->
+    <nav class="bottom-nav">
+        <button class="nav-btn active" onclick="switchTab('view-today')">🏠<br>Hoy</button>
+        <button class="nav-btn" onclick="switchTab('view-month')">📅<br>Mes</button>
+        <button class="nav-btn" onclick="switchTab('view-convert')">🔄<br>Convertir</button>
+        <button class="nav-btn" onclick="switchTab('view-holidays')">🎉<br>Festivos</button>
+        <button class="nav-btn" onclick="switchTab('view-shabbat')">🕯️<br>Shabat</button>
+        <button class="nav-btn" onclick="switchTab('view-location')">📍<br>Ubicación</button>
+    </nav>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

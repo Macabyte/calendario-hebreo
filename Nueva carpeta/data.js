@@ -138,7 +138,7 @@ const DISPLAY_NAMES = {
 };
 
 const MESES_HEBREOS_ES = {
-    'Nisan': 'Nisán', 'Iyar': 'Iyar', 'Iyyar': 'Iyar', 'Sivan': 'Siván', 'Tammuz': 'Tamuz', 'Tamuz': 'Tamuz',
+    'Nisan': 'Nisán', 'Iyar': 'Iyar', 'Sivan': 'Siván', 'Tamuz': 'Tamuz',
     'Av': 'Av', 'Elul': 'Elul', 'Tishrei': 'Tishrei', 'Cheshvan': 'Jeshván',
     'Kislev': 'Kislev', 'Tevet': 'Tevet', "Sh'vat": 'Shevat', 'Adar': 'Adar',
     'Adar I': 'Adar I', 'Adar II': 'Adar II'

@@ -326,10 +326,7 @@ function traducirTexto(text) {
     t = t.replace(/Havdalah/gi, 'Havdalá');
     
     t = t.replace(/Rosh Chodesh/gi, 'Rosh Jódesh');
-    t = t.replace(/\bChodesh\b/gi, 'Jódesh'); // Cobertura genérica cuando "Chodesh" va sin "Rosh" delante
-
-    t = t.replace(/Finish eating chametz/gi, 'Hora límite para comer jametz');
-
+    
     t = t.replace(/Shabat Mevarchim Chodesh/gi, 'Shabat Mevarjim');
     t = t.replace(/Shabat Mevorchim Chodesh/gi, 'Shabat Mevarjim');
     t = t.replace(/Shabat Mevarchim/gi, 'Shabat Mevarjim');
@@ -385,14 +382,6 @@ function traducirTexto(text) {
         const regex = new RegExp(`(?<=^|\\s|-)${heb.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|\\s|-)`, 'gi');
         t = t.replace(regex, app);
     }
-
-    // Traducir nombres de meses hebreos dentro de títulos de eventos (Rosh Jódesh, Mevarjim, etc.)
-    const mesesOrdenados = Object.entries(MESES_HEBREOS_ES).sort((a, b) => b[0].length - a[0].length);
-    mesesOrdenados.forEach(([heb, es]) => {
-        const escapado = heb.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regexMes = new RegExp(`\\b${escapado}\\b`, 'g');
-        t = t.replace(regexMes, es);
-    });
 
     t = t.replace(/Ch/g, 'J');
     t = t.replace(/ch/g, 'j');
