@@ -23,8 +23,34 @@
             <button id="btn-header-location-tag" class="btn-header-location" onclick="switchTab('view-location')" title="Cambiar ubicación y rito">
                 📍 Cargando...
             </button>
+            <button id="btn-about-info" class="btn-header-location" onclick="showAboutModal()" title="Acerca de esta aplicación" style="margin-left: 6px; padding: 6px 10px;">
+                ℹ️
+            </button>
         </div>
     </header>
+
+    <!-- Modal Acerca de / Créditos / Advertencia -->
+    <div id="about-modal-overlay" class="about-modal-overlay" style="display: none;">
+        <div class="about-modal-box">
+            <h2>✡️ Calendario Hebreo</h2>
+            <p class="about-modal-line" style="color: #94a3b8; font-size: 0.8rem;">Versión 1.0</p>
+            <p class="about-modal-line">Por <strong>Macabyte</strong>, con la colaboración de Gemini y Claude.</p>
+
+            <hr class="separator">
+
+            <p class="about-modal-warning">
+                ⚠️ Esta aplicación se ofrece "tal cual", sin garantías. Aunque se ha procurado la máxima precisión, puede contener errores en fechas, horarios o traducciones. Verifica siempre la información crítica (ayunos, Shabat, festividades) con una fuente rabínica de confianza.
+            </p>
+
+            <hr class="separator">
+
+            <p class="about-modal-credit">
+                Los datos de calendario hebreo, Shabat y festividades se obtienen de <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" class="parasha-link">Hebcal.com</a>, con licencia <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer" class="parasha-link">CC BY 4.0</a>.
+            </p>
+
+            <button class="btn-primary" style="margin-top: 14px;" onclick="closeAboutModal()">Entendido</button>
+        </div>
+    </div>
 
     <!-- Contenido de las Pestañas -->
     <main class="main-content">

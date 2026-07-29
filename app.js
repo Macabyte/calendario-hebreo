@@ -60,6 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loadMonthCalendar();
         loadHolidays();
         fetchShabbatTabInfo();
+
+        if (!localStorage.getItem('app_about_seen')) {
+            showAboutModal();
+        }
     } catch (e) {
         console.error("Error durante la inicialización de la PWA:", e);
     }
@@ -83,6 +87,21 @@ function switchTab(tabId) {
         if (activeBtn) activeBtn.classList.add('active');
     } catch (e) {
         console.error("Error al cambiar de pestaña:", e);
+    }
+}
+
+function showAboutModal() {
+    const overlay = document.getElementById('about-modal-overlay');
+    if (overlay) overlay.style.display = 'flex';
+}
+
+function closeAboutModal() {
+    const overlay = document.getElementById('about-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    try {
+        localStorage.setItem('app_about_seen', 'true');
+    } catch (e) {
+        console.warn("No se pudo guardar el estado del modal 'Acerca de':", e);
     }
 }
 

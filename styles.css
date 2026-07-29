@@ -557,3 +557,56 @@ body {
         font-size: 16px !important;
     }
 }
+/* --- MODAL ACERCA DE / CRÉDITOS --- */
+.about-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.about-modal-box {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 22px;
+    max-width: 420px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+.about-modal-box h2 {
+    color: #1a365d;
+    font-size: 1.15rem;
+    margin-bottom: 8px;
+}
+
+.about-modal-line {
+    font-size: 0.9rem;
+    color: #334155;
+    margin-bottom: 4px;
+}
+
+.about-modal-warning {
+    font-size: 0.85rem;
+    color: #7c2d12;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    padding: 10px;
+    line-height: 1.45;
+}
+
+.about-modal-credit {
+    font-size: 0.82rem;
+    color: #64748b;
+    line-height: 1.5;
+}
