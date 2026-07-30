@@ -269,7 +269,7 @@ function setLocationFromGPS() {
             }
         },
         (error) => {
-            alert("No se pudo obtener la ubicación mediante GPS.");
+            alert("DIAGNÓSTICO — código: " + error.code + " | mensaje: " + error.message);
             updateLocationUI();
         }
     );
