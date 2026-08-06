@@ -466,77 +466,199 @@ async function loadTodayView() {
     fetchUpcomingEvents();
 }
 
+// --- MOTOR COMPARTIDO DE CÁLCULO DE SHABAT ---
+async function fetchEventsWindow(startDate, endDate) {
+    const iParam = getIsraelParam();
+    const monthsNeeded = new Set();
+    let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const lastCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= lastCursor) {
+        monthsNeeded.add(`${cursor.getFullYear()}-${cursor.getMonth() + 1}`);
+        cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    let allItems = [];
+    for (const my of monthsNeeded) {
+        const [y, m] = my.split('-').map(Number);
+        try {
+            const res = await fetch(`https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&mf=on&ss=on&s=on&c=on&m=on&nx=on&mvch=on&o=on&geo=pos&latitude=${userLocation.lat}&longitude=${userLocation.lng}&year=${y}&month=${m}${iParam}`);
+            const data = await res.json();
+            if (data && data.location && data.location.tzid) userLocation.tzid = data.location.tzid;
+            if (data && Array.isArray(data.items)) allItems = allItems.concat(data.items);
+        } catch (e) {
+            console.warn("Fallo al obtener ventana de eventos:", e);
+        }
+    }
+
+    return allItems.filter(item => {
+        if (!item || !item.date) return false;
+        const d = parseHebcalDate(item.date);
+        return !isNaN(d.getTime()) && d >= startDate && d <= endDate;
+    });
+}
+
+function groupByShabbat(items) {
+    const groups = {};
+    items.forEach(item => {
+        if (!item || !item.date) return;
+        const d = parseHebcalDate(item.date);
+        if (isNaN(d.getTime())) return;
+        const dw = getDayOfWeekLocal(d);
+
+        let sabadoObj = new Date(d);
+        if (dw === 5) sabadoObj.setDate(d.getDate() + 1);
+        else if (dw !== 6) sabadoObj.setDate(d.getDate() + ((6 - dw + 7) % 7));
+
+        const key = `${sabadoObj.getFullYear()}-${String(sabadoObj.getMonth()+1).padStart(2,'0')}-${String(sabadoObj.getDate()).padStart(2,'0')}`;
+
+        if (!groups[key]) {
+            groups[key] = { sabadoDate: sabadoObj, candles: null, havdalah: null, parashat: null, extraEvents: [] };
+        }
+
+        if (item.category === 'candles') groups[key].candles = item;
+        else if (item.category === 'havdalah') groups[key].havdalah = item;
+        else if (item.category === 'parashat' || (item.title && item.title.startsWith('Parashat'))) groups[key].parashat = item;
+        else if (dw === 5 || dw === 6) groups[key].extraEvents.push(traducirTexto(item.title));
+    });
+        return groups;
+}
+
+async function getActiveShabbatGroup(now) {
+    const dayOfWeek = getDayOfWeekLocal(now);
+    const windowStart = new Date(now); windowStart.setHours(0,0,0,0);
+    const windowEnd = new Date(now); windowEnd.setDate(windowEnd.getDate() + 15); windowEnd.setHours(23,59,59,999);
+
+    const items = await fetchEventsWindow(windowStart, windowEnd);
+    const groups = groupByShabbat(items);
+    const sortedKeys = Object.keys(groups).sort();
+
+    for (const key of sortedKeys) {
+        const group = groups[key];
+        const sabadoFin = new Date(group.sabadoDate); sabadoFin.setHours(23,59,59,999);
+        if (sabadoFin < now) continue;
+
+        if (dayOfWeek === 6 && group.havdalah) {
+            const hDate = parseHebcalDate(group.havdalah.date);
+            if (!isNaN(hDate.getTime()) && now.getTime() > hDate.getTime()) continue;
+        }
+        return group;
+    }
+    return null;
+}
+
+// --- TARJETA "ESTE SHABAT" (VISTA HOY) ---
 async function fetchTodayShabbatAndParasha() {
     const cardShabbat = document.getElementById('card-shabbat-today');
-    const cardParasha = document.getElementById('card-parasha-today');
     const shabbatInfoElem = document.getElementById('shabbat-today-info');
-    const parashaInfoElem = document.getElementById('parasha-today-info');
 
     try {
         const now = new Date();
-        const dayOfWeek = getDayOfWeekLocal(now);
-        const iParam = getIsraelParam();
+        const group = await getActiveShabbatGroup(now);
 
-        if (dayOfWeek !== 5 && dayOfWeek !== 6) {
+        if (!group) {
             if (cardShabbat) cardShabbat.style.display = 'none';
-            if (cardParasha) cardParasha.style.display = 'none';
             return;
         }
 
-        const res = await fetch(`https://www.hebcal.com/shabbat?cfg=json&geo=pos&latitude=${userLocation.lat}&longitude=${userLocation.lng}&M=on${iParam}`);
-        const data = await res.json();
-
-        if (data && data.location && data.location.tzid) {
-            userLocation.tzid = data.location.tzid;
-        }
-
-        const items = (data && Array.isArray(data.items)) ? data.items : [];
-        let candles = items.find(i => i && i.category === 'candles');
-        let havdalah = items.find(i => i && i.category === 'havdalah');
-        let parasha = items.find(i => i && i.category === 'parashat');
-
-        if (havdalah && havdalah.date) {
-            const hDate = parseHebcalDate(havdalah.date);
-            if (!isNaN(hDate.getTime()) && now.getTime() > hDate.getTime()) {
-                if (cardShabbat) cardShabbat.style.display = 'none';
-                if (cardParasha) cardParasha.style.display = 'none';
-                return;
-            }
-        }
-
         if (cardShabbat) cardShabbat.style.display = 'block';
-        if (cardParasha) cardParasha.style.display = 'block';
 
-        let shabbatHtml = '';
-        if (candles && candles.date) {
-            let cDate = parseHebcalDate(candles.date);
-            if (!isNaN(cDate.getTime())) {
-                shabbatHtml += `🕯️ Encendido de velas (viernes): <strong>${formatTimeLocal(cDate)}</strong><br>`;
-            }
-        }
-        if (havdalah && havdalah.date) {
-            let hDate = parseHebcalDate(havdalah.date);
-            if (!isNaN(hDate.getTime())) {
-                shabbatHtml += `🍷 Havdalá: <strong>${formatTimeLocal(hDate)}</strong>`;
-            }
-        }
         if (shabbatInfoElem) {
-            shabbatInfoElem.innerHTML = shabbatHtml || 'No hay datos de Shabat para esta semana.';
+            shabbatInfoElem.innerHTML = renderShabbatGroupDetails(group);
         }
-
-        if (parashaInfoElem) {
-            if (parasha && parasha.title) {
-                let nombreLimpio = traducirTexto(parasha.title).replace(/^Parashat\s+/i, '');
-                parashaInfoElem.innerHTML = `<strong>Parashat ${obtenerEnlaceParasha(nombreLimpio)}</strong>`;
-            } else {
-                parashaInfoElem.innerHTML = '<strong>Lectura especial</strong>';
-            }
-        }
-    } catch(e) {
+    } catch (e) {
         console.error("Error al cargar Shabat/Parashá de hoy:", e);
         if (cardShabbat) cardShabbat.style.display = 'none';
-        if (cardParasha) cardParasha.style.display = 'none';
     }
+}
+
+// --- PESTAÑA SHABAT ---
+async function fetchShabbatTabInfo() {
+    const container = document.getElementById('shabbat-details-list');
+    if (!container) return;
+
+    try {
+        const now = new Date();
+        const windowStart = new Date(now); windowStart.setHours(0,0,0,0);
+        const windowEnd = new Date(now); windowEnd.setDate(windowEnd.getDate() + 21); windowEnd.setHours(23,59,59,999);
+
+        const items = await fetchEventsWindow(windowStart, windowEnd);
+        const groups = groupByShabbat(items);
+        const dayOfWeek = getDayOfWeekLocal(now);
+        const sortedKeys = Object.keys(groups).sort();
+        const validKeys = [];
+
+        for (const key of sortedKeys) {
+            const group = groups[key];
+            const sabadoFin = new Date(group.sabadoDate); sabadoFin.setHours(23,59,59,999);
+            if (sabadoFin < now) continue;
+            if (dayOfWeek === 6 && group.havdalah) {
+                const hDate = parseHebcalDate(group.havdalah.date);
+                if (!isNaN(hDate.getTime()) && now.getTime() > hDate.getTime()) continue;
+            }
+            validKeys.push(key);
+        }
+
+        let html = `<div style="margin-bottom: 14px; color: var(--ink-soft); font-size: 0.9rem;"><strong>Ubicación:</strong> ${userLocation.name}</div>`;
+        if (validKeys.length > 0) html += renderShabbatGroupBlock('Horario de este Shabat', groups[validKeys[0]]);
+        if (validKeys.length > 1) {
+            html += `<hr style="border:0; border-top: 1px dashed #cbd5e1; margin: 15px 0;">`;
+            html += renderShabbatGroupBlock('Horario del próximo Shabat', groups[validKeys[1]]);
+        }
+        if (validKeys.length === 0) html += `<div style="color: #64748b;">No hay próximos eventos de Shabat disponibles en este periodo.</div>`;
+
+        container.innerHTML = html;
+    } catch (e) {
+        console.error("Error al cargar detalles de la pestaña Shabat:", e);
+        container.innerHTML = `<div style="color: #ef4444;">Error al cargar los detalles de Shabat.</div>`;
+    }
+}
+
+function renderShabbatGroupDetails(group) {
+    if (!group) return '';
+    let html = '';
+
+    const viernesObj = new Date(group.sabadoDate);
+    viernesObj.setDate(viernesObj.getDate() - 1);
+
+    if (group.candles) {
+        const cDate = parseHebcalDate(group.candles.date);
+        if (!isNaN(cDate.getTime())) {
+            html += `
+            <div class="holiday-item" style="margin-bottom: 8px; padding-bottom: 6px;">
+            <div class="holiday-date" style="color: var(--ink); font-size: 0.9rem;">📅 <strong>Viernes ${formatDateLocal(viernesObj)}:</strong></div>
+            <div style="margin-left: 18px; margin-top: 2px; font-size: 0.88rem; color: var(--ink-soft);">🕯️ Encendido de velas: <strong>${formatTimeLocal(cDate)}</strong></div>
+            </div>
+            `;
+        }
+    }
+
+    let sabadoLineas = [];
+    if (group.parashat) {
+        let nombreLimpio = traducirTexto(group.parashat.title).replace(/^Parashat\s+/i, '');
+        sabadoLineas.push(`<strong>Parashat ${obtenerEnlaceParasha(nombreLimpio)}</strong>`);
+    } else {
+        sabadoLineas.push(`<strong>Lectura especial</strong>`);
+    }
+    group.extraEvents.forEach(ev => sabadoLineas.push(ev));
+    if (group.havdalah) {
+        const hDate = parseHebcalDate(group.havdalah.date);
+        if (!isNaN(hDate.getTime())) sabadoLineas.push(`🍷 Havdalá: <strong>${formatTimeLocal(hDate)}</strong>`);
+    }
+
+    html += `
+    <div class="holiday-item" style="margin-bottom: 8px; padding-bottom: 6px;">
+    <div class="holiday-date" style="color: var(--ink); font-size: 0.9rem;">📅 <strong>Sábado ${formatDateLocal(group.sabadoDate)}:</strong></div>
+    <div style="margin-left: 18px; margin-top: 2px; font-size: 0.88rem; color: var(--ink-soft);">
+    ${sabadoLineas.join('<br>')}
+    </div>
+    </div>
+    `;
+    return html;
+}
+
+function renderShabbatGroupBlock(title, group) {
+    if (!group) return '';
+    return `<h4 style="margin: 8px 0 12px 0; color: var(--burgundy);">${title}</h4>` + renderShabbatGroupDetails(group);
 }
 
 async function fetchUpcomingEvents() {
@@ -652,6 +774,13 @@ async function fetchUpcomingEvents() {
 
         Object.keys(shabbatGroups).forEach(key => {
             const group = shabbatGroups[key];
+            // Excluir el Shabat ya mostrado en la tarjeta "Este Shabat"
+            if (dayOfWeek === 5 || dayOfWeek === 6) {
+                const activeSaturday = new Date(now);
+                if (dayOfWeek === 5) activeSaturday.setDate(activeSaturday.getDate() + 1);
+                const activeKey = `${activeSaturday.getFullYear()}-${String(activeSaturday.getMonth()+1).padStart(2,'0')}-${String(activeSaturday.getDate()).padStart(2,'0')}`;
+                if (key === activeKey) return;
+            }
             let lineasShabat = [];
             let sortTimestamp = group.sabadoDate.getTime();
 
@@ -943,157 +1072,6 @@ async function loadHolidays() {
         console.error("Error cargando festivos:", e);
         container.innerText = "Error al cargar los festivos.";
     }
-}
-
-// --- SHABAT TAB ---
-async function fetchShabbatTabInfo() {
-    const container = document.getElementById('shabbat-details-list');
-    if (!container) return;
-
-    try {
-        const now = new Date();
-        const iParam = getIsraelParam();
-
-        const res = await fetch(`https://www.hebcal.com/shabbat?cfg=json&geo=pos&latitude=${userLocation.lat}&longitude=${userLocation.lng}&M=on${iParam}`);
-        const data = await res.json();
-
-        if (data && data.location && data.location.tzid) {
-            userLocation.tzid = data.location.tzid;
-        }
-
-        let items = (data && Array.isArray(data.items)) ? data.items : [];
-
-        items = items.filter(item => {
-            if (!item) return false;
-            return item.category === 'candles' || 
-                   item.category === 'havdalah' || 
-                   item.category === 'parashat' || 
-                   (item.category === 'mevorchim' || item.category === 'mevarchim') ||
-                   (item.title && (item.title.startsWith('Shabbat') || item.title.startsWith('Parashat')));
-        });
-
-        let html = `<strong>Ubicación:</strong> ${userLocation.name}<br><br>`;
-
-        let groups = {};
-        items.forEach(item => {
-            if (!item.date) return;
-            let d = parseHebcalDate(item.date);
-            if (isNaN(d.getTime())) return;
-
-            let itemDayOfWeek = getDayOfWeekLocal(d);
-            let sabadoObj = new Date(d);
-            
-            // Forzar lógicamente que todo evento caiga bajo el Sábado de esa semana
-            if (itemDayOfWeek !== 6) {
-                let daysToSaturday = (6 - itemDayOfWeek + 7) % 7;
-                sabadoObj.setDate(d.getDate() + daysToSaturday);
-            }
-
-            let key = `${sabadoObj.getFullYear()}-${String(sabadoObj.getMonth()+1).padStart(2,'0')}-${String(sabadoObj.getDate()).padStart(2,'0')}`;
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(item);
-        });
-
-        let sortedKeys = Object.keys(groups).sort();
-        let validKeys = [];
-
-        for (let key of sortedKeys) {
-            let parts = key.split('-').map(Number);
-            let gDate = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
-            if (gDate.getTime() < now.getTime()) continue; 
-
-            let currentGroup = groups[key];
-            let havdalahItem = currentGroup.find(i => i.category === 'havdalah');
-            let isPast = false;
-            
-            if (havdalahItem && havdalahItem.date) {
-                let hDate = parseHebcalDate(havdalahItem.date);
-                if (!isNaN(hDate.getTime()) && now.getTime() > hDate.getTime()) {
-                    isPast = true;
-                }
-            }
-            if (!isPast) {
-                validKeys.push(key);
-            }
-        }
-
-        if (validKeys.length > 0) {
-            html += renderShabbatBlock('Horario de este Shabat', groups[validKeys[0]]);
-        }
-        if (validKeys.length > 1) {
-            html += `<hr style="border:0; border-top: 1px dashed #cbd5e1; margin: 15px 0;">`;
-            html += renderShabbatBlock('Horario del próximo Shabat', groups[validKeys[1]]);
-        }
-
-        if (validKeys.length === 0) {
-            html += `<div style="color: #64748b;">No hay próximos eventos de Shabat disponibles en este periodo.</div>`;
-        }
-
-        container.innerHTML = html;
-    } catch(e) {
-        console.error("Error al cargar detalles de la pestaña Shabat:", e);
-        container.innerHTML = `<div style="color: #ef4444;">Error al cargar los detalles de Shabat.</div>`;
-    }
-}
-
-function renderShabbatBlock(title, itemList) {
-    if (!Array.isArray(itemList)) return '';
-    let blockHtml = `<h4 style="margin: 8px 0 12px 0; color: #2b579a;">${title}</h4>`;
-    
-    let dateMap = {};
-    itemList.forEach(item => {
-        if (!item || !item.date) return;
-        let d = parseHebcalDate(item.date);
-        if (isNaN(d.getTime())) return;
-
-        let dateKey = formatDateLocal(d);
-        if (!dateMap[dateKey]) dateMap[dateKey] = [];
-        dateMap[dateKey].push(item);
-    });
-
-    Object.keys(dateMap).forEach(dateKey => {
-        let evList = dateMap[dateKey];
-        if (evList.length === 0) return;
-
-        let firstD = parseHebcalDate(evList[0].date);
-        let dayOfWeek = getDayOfWeekLocal(firstD);
-        let dayName = DIAS_SEMANA[dayOfWeek];
-
-        let lineas = [];
-        let hasParashat = false;
-
-        evList.forEach(ev => {
-            let dObj = parseHebcalDate(ev.date);
-            let hasTime = ev.date.includes('T') && !ev.date.includes('T00:00:00') && !ev.date.includes('T02:00:00');
-            let timeStr = hasTime ? ` • ⏰ ${formatTimeLocal(dObj)}` : '';
-            
-            let textoEv = traducirTexto(ev.title);
-            if (ev.category === 'parashat' || textoEv.startsWith('Parashat')) {
-                let nombreLimpio = textoEv.replace(/^Parashat\s+/i, '');
-                textoEv = `Parashat ${obtenerEnlaceParasha(nombreLimpio)}`;
-                hasParashat = true;
-            }
-
-            lineas.push(`<strong>${textoEv}</strong>${timeStr}`);
-        });
-
-        if (dayOfWeek === 6 && !hasParashat) {
-            lineas.unshift(`<strong>Lectura especial</strong>`);
-        }
-
-        blockHtml += `
-            <div class="holiday-item" style="margin-bottom: 8px; padding-bottom: 6px;">
-                <div class="holiday-date" style="color: #1e293b; font-size: 0.9rem;">
-                    📅 <strong>${dayName} ${dateKey}:</strong>
-                </div>
-                <div style="margin-left: 18px; margin-top: 2px; font-size: 0.88rem; color: #334155;">
-                    ${lineas.join('<br>')}
-                </div>
-            </div>
-        `;
-    });
-
-    return blockHtml;
 }
 
 // --- CALENDARIO MENSUAL ---
